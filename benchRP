@@ -1,0 +1,196 @@
+#!/usr/bin/env python3
+"""benchMT  -  SETI multi-threaded MB Benchmark Tool
+
+  Utility to read MB_bench_213 results file and output a pipe delimited file for import into excel 
+"""
+__author__ = "RueiKe"
+__copyright__ = "Copyright (C) 2018 RueiKe"
+__credits__ = ""
+__license__ = "GNU General Public License"
+__program_name__ = "benchRP"
+__version__ = "v1.00"
+__maintainer__ = "RueiKe"
+__status__ = "Release Candidate RC1"
+
+import argparse
+import re
+
+debug = False
+
+class MB:
+    def __init__(self, name):
+        self.argvals = {
+        "name" : name,
+        "appname" : "",
+        "WU" : "", 
+        "device" : 1,
+        "nog" : False,
+        "v" : -1,
+        "period_iterations_num" : -1,
+        "pref_wg_size" : -1,
+        "pref_wg_num_per_cu" : -1,
+        "spike_fft_thresh" : -1,
+        "sbs" : -1,
+        "hp" : False,
+        "high_prec_timer" : False,
+        "cpu_lock" : False,
+        "total_GPU_instances_num" : -1,
+        "cpu_lock_fixed_cpu" : -1,
+        "no_cpu_lock" : False,
+        "no_defaults_scaling" : False,
+        "high_perf" : False,
+        "low_perf" : False,
+        "instances_per_device" : -1,
+        "gpu_lock" : False,
+        "use_sleep" : False,
+        "use_sleep_ex" : -1,
+        "no_use_sleep" : False,
+        "sleep_quantum" : -1,
+        "sleep_margin" : -1.0,
+        "tt" : -1,
+        "no_caching" : False,
+        "tune" : [-1, -1, -1, -1],
+        "oclfft_tune_gr" : -1,
+        "oclfft_tune_lr" : -1,
+        "oclfft_tune_wg" : -1,
+        "oclfft_tune_ls" : -1,
+        "oclfft_tune_bn" : -1,
+        "oclfft_tune_cw" : -1,
+        "elapsed_time" : -1,
+        "cpu_time" : -1
+        }
+
+    def headerLine(self):
+        _separator = "|"
+        return _separator.join(list(self.argvals.keys()))
+
+
+    def dataLine(self):
+        _separator = "|"
+        _outdataline = ""
+        return _separator.join(list(map(str, list(self.argvals.values()))))
+
+    def addData(self, _optline):
+        _separator = ","
+        _optline = _optline.replace('-','')
+        _optv = _optline.split(' ')
+        _opt = _optv[0]
+
+        if (_opt in self.argvals) == False:
+             print("Invalid arg value: ", _opt)
+             return
+        _len = len(_optv)
+
+        if _len > 3:
+           _optarg = _optv[1:_len]
+           _optarg = _separator.join(_optv[1:_len])
+           _optarg = re.sub(r'^[\s]*', '', _optarg)
+        elif _len == 3:
+           _optarg = _optv[1]
+           _optarg = re.sub(r'^[\s]*', '', _optarg)
+        else: 
+           _optarg = True
+
+        if _opt == "v" or _opt == "period_iterations_num" or _opt == "pref_wg_size" or _opt == "pref_wg_num_per_cu"  \
+           or _opt == "spike_fft_thresh" or _opt == "sbs" or _opt == "total_GPU_instances_num" \
+           or _opt == "cpu_lock_fixed_cpu" or _opt == "instances_per_device" or _opt == "use_sleep_ex" \
+           or _opt == "sleep_quantum" or _opt == "tt" or _opt == "oclfft_tune_gr" or _opt == "oclfft_tune_lr" \
+           or _opt == "oclfft_tune_wg" or _opt == "oclfft_tune_ls" or _opt == "oclfft_tune_bn" \
+           or _opt == "oclfft_tune_cw" or _opt == "device":
+           self.argvals[_opt] = int(_optarg)
+           return
+
+        if _opt == "hp" or _opt == "high_prec_timer" or _opt == "cpu_lock" or _opt == "no_cpu_lock" \
+           or _opt == "no_defaults_scaling" or _opt == "high_perf" or _opt == "low_perf" or _opt == "gpu_lock" \
+           or _opt == "use_sleep" or _opt == "no_use_sleep" or _opt == "nog" or _opt == "no_caching":
+           self.argvals[_opt] = True
+           return
+
+        if _opt == "sleep_margin":
+           self.argvals[_opt] = float(_optarg)
+           return
+
+        if _opt == "tune":
+           self.argvals[_opt] = list(map(int, _optarg.split(',')))
+           if debug: print("tune argument is:", _optarg, ":", "tuneopts is:", self.argvals[_opt])
+           return
+
+        print("Invalid arg value: ", _opt)
+        return
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--i", help="Specify input file name", type=str)
+    parser.add_argument("--o", help="Specify output file name", type=str)
+    parser.add_argument("--d", help="Debug output", action="store_true")
+    args = parser.parse_args()
+
+    dataFlag = False
+    debug = False
+    infile = args.i
+    outfile = args.o
+    if args.d:
+        print("Debug output enabled")
+        debug = True
+    infileptr = open(infile, 'r') 
+    outfileptr = open(outfile, 'w')
+    wuName = "None"
+
+    for line in infileptr:
+        # Find beginning of data table
+        if dataFlag == False:
+            searchObj = re.search('Quick timetable', line)
+            if searchObj != None:
+                mbItem = MB(infile)
+                outfileptr.write(mbItem.headerLine())
+                outfileptr.write('\n')
+                dataFlag = True
+                if debug: print(line)
+            continue
+
+        line = line.replace('\n', '')
+        line = line.replace('\r', '')
+        line = line.replace(' :', '')
+        #Find WU name
+        searchObj=re.search('^WU', line)
+        if searchObj != None:
+            lineitems = line.split(' ')
+            wuName = lineitems[1]
+            if debug: print("WU is ", wuName)
+            continue
+
+        #Find data line begining with application name
+        searchObj=re.search('^MB', line)
+        if searchObj != None:
+            mbItem = MB(infile)
+            mbItem.argvals["WU"] = wuName
+
+            lineitems = line.split('-')
+            mbItem.argvals["appname"] = lineitems[0].replace(' ', '')
+            if debug: print(lineitems)
+            option = ""
+            optionarg = ""
+            for i in range(1,len(lineitems)):
+                mbItem.addData(lineitems[i])
+
+        #Find data for Elapsed and CPU Time
+        line = re.sub(r'^[\s]*', '', line)
+        searchObj = re.search('^Elapsed', line)
+        if searchObj != None:
+            lineitems = line.split(' ')
+            mbItem.argvals["elapsed_time"] = lineitems[1].replace(' ', '')
+            continue
+        searchObj = re.search('^CPU', line)
+        if searchObj != None:
+            lineitems = line.split(' ')
+            mbItem.argvals["cpu_time"] = lineitems[1].replace(' ', '')
+            outfileptr.write(mbItem.dataLine())
+            outfileptr.write('\n')
+
+    infileptr.close()
+    outfileptr.close()
+
+
+if __name__ == "__main__":
+    main()
+
