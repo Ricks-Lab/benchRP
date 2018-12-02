@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """benchRP  -  Results Parser for SETI MB Benchmark Tools
 
-  Utility to read MB_bench_213 results file and output a pipe delimited file for import into excel 
+  Utility to output a pipe delimitted file, which also expands command line arguments with argument name
+  in the header and argument value as data.  This is intended to facilitate the analysis of the sensitivity
+  of processing speed and accuracy as a function of command line tuning options.  It is able to process the 
+  output of  the Windows based MB_bench_213 benchmark utility or the Linux based benchMT pst file.
 """
 __author__ = "RueiKe"
 __copyright__ = "Copyright (C) 2018 RueiKe"
@@ -10,7 +13,7 @@ __license__ = "GNU General Public License"
 __program_name__ = "benchRP"
 __version__ = "v1.00"
 __maintainer__ = "RueiKe"
-__status__ = "Release Candidate RC1"
+__status__ = "Initial Release"
 
 import argparse
 import re
