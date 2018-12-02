@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""benchMT  -  SETI multi-threaded MB Benchmark Tool
+"""benchRP  -  Results Parser for SETI MB Benchmark Tools
 
   Utility to read MB_bench_213 results file and output a pipe delimited file for import into excel 
 """
@@ -14,10 +14,18 @@ __status__ = "Release Candidate RC1"
 
 import argparse
 import re
+import os
 
-debug = False
+class RP_CONST:
+    def __init__(self):
+        self.input_file = ""
+        self.output_file = ""
+        self.format = "MB213"          # default is MTpsv
+        self.DEBUG = False
+rb_const=RP_CONST()
 
-class MB:
+
+class MB_args:
     def __init__(self, name):
         self.argvals = {
         "name" : name,
@@ -49,6 +57,7 @@ class MB:
         "sleep_margin" : -1.0,
         "tt" : -1,
         "no_caching" : False,
+        "nographics" : False,
         "tune" : [-1, -1, -1, -1],
         "oclfft_tune_gr" : -1,
         "oclfft_tune_lr" : -1,
@@ -71,6 +80,7 @@ class MB:
         return _separator.join(list(map(str, list(self.argvals.values()))))
 
     def addData(self, _optline):
+        print("Optline value: [" + _optline + "]")
         _separator = ","
         _optline = _optline.replace('-','')
         _optv = _optline.split(' ')
@@ -85,6 +95,8 @@ class MB:
            _optarg = _optv[1:_len]
            _optarg = _separator.join(_optv[1:_len])
            _optarg = re.sub(r'^[\s]*', '', _optarg)
+           _optarg = re.sub(',$', '', _optarg)
+           print("Optarg value: [" + _optarg + "]")
         elif _len == 3:
            _optarg = _optv[1]
            _optarg = re.sub(r'^[\s]*', '', _optarg)
@@ -102,7 +114,7 @@ class MB:
 
         if _opt == "hp" or _opt == "high_prec_timer" or _opt == "cpu_lock" or _opt == "no_cpu_lock" \
            or _opt == "no_defaults_scaling" or _opt == "high_perf" or _opt == "low_perf" or _opt == "gpu_lock" \
-           or _opt == "use_sleep" or _opt == "no_use_sleep" or _opt == "nog" or _opt == "no_caching":
+           or _opt == "use_sleep" or _opt == "no_use_sleep" or _opt == "nog" or _opt == "no_caching" or _opt == "nographics":
            self.argvals[_opt] = True
            return
 
@@ -111,29 +123,22 @@ class MB:
            return
 
         if _opt == "tune":
+           print("tune value: [" , _optarg.split(',') , "]")
            self.argvals[_opt] = list(map(int, _optarg.split(',')))
-           if debug: print("tune argument is:", _optarg, ":", "tuneopts is:", self.argvals[_opt])
+           if rb_const.DEBUG: print("tune argument is:", _optarg, ":", "tuneopts is:", self.argvals[_opt])
            return
 
         print("Invalid arg value: ", _opt)
         return
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--i", help="Specify input file name", type=str)
-    parser.add_argument("--o", help="Specify output file name", type=str)
-    parser.add_argument("--d", help="Debug output", action="store_true")
-    args = parser.parse_args()
+def parse_MTpsv():
+    pass
+
+def parse_MB213():
+    infileptr = open(rb_const.input_file, 'r') 
+    outfileptr = open(rb_const.output_file, 'w')
 
     dataFlag = False
-    debug = False
-    infile = args.i
-    outfile = args.o
-    if args.d:
-        print("Debug output enabled")
-        debug = True
-    infileptr = open(infile, 'r') 
-    outfileptr = open(outfile, 'w')
     wuName = "None"
 
     for line in infileptr:
@@ -141,11 +146,11 @@ def main():
         if dataFlag == False:
             searchObj = re.search('Quick timetable', line)
             if searchObj != None:
-                mbItem = MB(infile)
+                mbItem = MB_args(rb_const.input_file)
                 outfileptr.write(mbItem.headerLine())
                 outfileptr.write('\n')
                 dataFlag = True
-                if debug: print(line)
+                if rb_const.DEBUG: print(line)
             continue
 
         line = line.replace('\n', '')
@@ -156,18 +161,18 @@ def main():
         if searchObj != None:
             lineitems = line.split(' ')
             wuName = lineitems[1]
-            if debug: print("WU is ", wuName)
+            if rb_const.DEBUG: print("WU is ", wuName)
             continue
 
         #Find data line begining with application name
         searchObj=re.search('^MB', line)
         if searchObj != None:
-            mbItem = MB(infile)
+            mbItem = MB_args(rb_const.input_file)
             mbItem.argvals["WU"] = wuName
 
             lineitems = line.split('-')
             mbItem.argvals["appname"] = lineitems[0].replace(' ', '')
-            if debug: print(lineitems)
+            if rb_const.DEBUG: print(lineitems)
             option = ""
             optionarg = ""
             for i in range(1,len(lineitems)):
@@ -189,6 +194,50 @@ def main():
 
     infileptr.close()
     outfileptr.close()
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--about", help="README", action="store_true", default=False)
+    parser.add_argument("--format_MB213", help="Parse MB_bench_213 format, instead of MTpsv", action="store_true", default=False)
+    parser.add_argument("--format_MTpsv", help="Parse benchMT psv format", action="store_true", default=False)
+    parser.add_argument("--input_file", help="Specify input file name", type=str, default="")
+    parser.add_argument("--output_file", help="Specify output file name", type=str, default="")
+    parser.add_argument("-d", "--debug", help="Debug output", action="store_true", default=False)
+    args = parser.parse_args()
+
+    if args.about == True :
+        print(__doc__ )
+        print("Author: ", __author__ )
+        print("Copyright: ", __copyright__)
+        print("Credits: ", __credits__)
+        print("License: ", __license__)
+        print("Version: ", __version__)
+        print("Maintainer: ", __maintainer__)
+        print("Status: ", __status__)
+        exit(0)
+
+    if args.input_file == "" or args.output_file == "":
+        print("Input file must be specified, exiting...")
+        exit(-1)
+    rb_const.input_file = args.input_file
+    if(os.path.isfile(rb_const.input_file) == False):
+        print("Input file [", rb_const.input_file,"] doesn't exist, exiting...")
+        exit(-1)
+
+    rb_const.output_file = args.output_file
+    if(os.path.isfile(rb_const.output_file) == True):
+        print("Output file [", rb_const.output_file,"] exists, exiting...")
+        exit(-1)
+
+    if args.debug:
+        print("Debug output enabled")
+        rb_const.DEBUG = True
+
+    if args.format_MB213 == True:
+        parse_MB213()
+    else:
+        parse_MTpsv()
 
 
 if __name__ == "__main__":
