@@ -80,15 +80,15 @@ class MB_args:
         return _separator.join(list(map(str, list(self.argvals.values()))))
 
     def addData(self, _optline):
-        print("Optline value: [" + _optline + "]")
+        if rb_const.DEBUG: print("Optline value: [" + _optline + "]")
         _separator = ","
         _optline = _optline.replace('-','')
         _optv = _optline.split(' ')
         _opt = _optv[0]
 
         if (_opt in self.argvals) == False:
-             print("Invalid arg value: ", _opt)
-             return
+            print("Invalid arg value: [", _opt, "]")
+            return
         _len = len(_optv)
 
         if _len > 3:
@@ -96,7 +96,7 @@ class MB_args:
            _optarg = _separator.join(_optv[1:_len])
            _optarg = re.sub(r'^[\s]*', '', _optarg)
            _optarg = re.sub(',$', '', _optarg)
-           print("Optarg value: [" + _optarg + "]")
+           if rb_const.DEBUG: print("Optarg value: [" + _optarg + "]")
         elif _len == 3:
            _optarg = _optv[1]
            _optarg = re.sub(r'^[\s]*', '', _optarg)
@@ -123,7 +123,7 @@ class MB_args:
            return
 
         if _opt == "tune":
-           print("tune value: [" , _optarg.split(',') , "]")
+           if rb_const.DEBUG: print("tune value: [" , _optarg.split(',') , "]")
            self.argvals[_opt] = list(map(int, _optarg.split(',')))
            if rb_const.DEBUG: print("tune argument is:", _optarg, ":", "tuneopts is:", self.argvals[_opt])
            return
@@ -132,7 +132,46 @@ class MB_args:
         return
 
 def parse_MTpsv():
-    pass
+    infileptr = open(rb_const.input_file, 'r') 
+    outfileptr = open(rb_const.output_file, 'w')
+    mbItem = MB_args(rb_const.input_file)
+
+    header = True
+    for line in infileptr:
+        orig_line = line.strip()
+        line = orig_line.replace('--','-')
+        if rb_const.DEBUG: print(line)
+        lineitems = line.split('|')
+        if header == True:
+            header = False
+            app_arg_index = 0
+            for header_val in lineitems:
+                if header_val == "app_args":
+                    new_header = mbItem.headerLine()
+                    new_header_items = new_header.split('|')
+                    new_header = orig_line +"|"+ "|".join(new_header_items[3:])
+                    outfileptr.write(new_header + '\n')
+                    break
+                else:
+                    app_arg_index += 1
+            continue
+        if rb_const.DEBUG: print("App_args Index = [", app_arg_index, "]")
+
+        app_arg_str = lineitems[app_arg_index]
+        if rb_const.DEBUG: print("app_arg_str:", app_arg_str)
+        app_arg_items = app_arg_str.split('-')
+        for arg in app_arg_items:
+            if arg == "" or arg == " ": continue
+            mbItem.addData(arg)
+        #for i in range(1,len(app_arg_items)):
+            #mbItem.addData(app_arg_items[i])
+        new_dataline = mbItem.dataLine()
+        new_dataline_items = new_dataline.split('|')
+        new_dataline = orig_line +"|"+ "|".join(new_dataline_items[3:])
+        outfileptr.write(new_dataline + '\n')
+
+    infileptr.close()
+    outfileptr.close()
 
 def parse_MB213():
     infileptr = open(rb_const.input_file, 'r') 
@@ -201,6 +240,7 @@ def main():
     parser.add_argument("--about", help="README", action="store_true", default=False)
     parser.add_argument("--format_MB213", help="Parse MB_bench_213 format, instead of MTpsv", action="store_true", default=False)
     parser.add_argument("--format_MTpsv", help="Parse benchMT psv format", action="store_true", default=False)
+    parser.add_argument("--overwrite", help="Overwrite the output file if it exists", action="store_true", default=False)
     parser.add_argument("--input_file", help="Specify input file name", type=str, default="")
     parser.add_argument("--output_file", help="Specify output file name", type=str, default="")
     parser.add_argument("-d", "--debug", help="Debug output", action="store_true", default=False)
@@ -227,8 +267,11 @@ def main():
 
     rb_const.output_file = args.output_file
     if(os.path.isfile(rb_const.output_file) == True):
-        print("Output file [", rb_const.output_file,"] exists, exiting...")
-        exit(-1)
+        if args.overwrite == True:
+            print("Output file [", rb_const.output_file,"] exists, overwritting...")
+        else:
+            print("Output file [", rb_const.output_file,"] exists, exiting...")
+            exit(-1)
 
     if args.debug:
         print("Debug output enabled")
